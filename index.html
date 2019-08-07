@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script src="https://unpkg.com/@microsoft/mgt/dist/bundle/mgt-loader.js"></script>
+</head>
+<body>
+    <mgt-msal-provider client-id="a974dfa0-9f57-49b9-95db-90f04ce2111a"></mgt-msal-provider>
+    <mgt-login></mgt-login>
+
+    <h1>Create an aad clientID demo</h1>
+
+    <select id="appSelection"></select>
+
+    <button id="newButton">Create New</button>
+
+    <pre id="code"></pre>
+
+    <script>
+
+        let appSelection = document.getElementById('appSelection');
+        appSelection.addEventListener('change', selectionChanged);
+
+        let newButton = document.getElementById('newButton');
+        newButton.addEventListener('click', handleNew);
+    
+        let provider = mgt.Providers.globalProvider;
+
+        if (provider) {
+            provider.onStateChanged(loadApps);
+            loadApps();
+        }
+
+        async function loadApps() {
+            if (provider.state == mgt.ProviderState.SignedIn) {
+                let client = provider.graph.client;
+
+                let applications = await client.api('applications')
+                                                .version('beta')
+                                                .middlewareOptions(mgt.prepScopes('Directory.AccessAsUser.All'))
+                                                .get();
+
+                while (appSelection.firstChild) {
+                    appSelection.removeChild(appSelection.firstChild);
+                }
+
+                if (applications) {
+                    for (let application of applications.value) {
+                        let option = document.createElement('option');
+                        option.text = application.displayName;
+                        option.value = application.appId;
+
+                        appSelection.appendChild(option);
+                    }
+
+                    selectionChanged();
+                }
+
+            }
+        }
+
+        function renderCode(clientId){
+            if (!clientId) {
+                clientId = '[CLIENT_ID]'
+            }
+
+            let codePre = document.getElementById('code');
+            codePre.innerText = `
+<mgt-msal-provider client-id="${clientId}"></mgt-msal-provider>
+<mgt-login></mgt-login>
+`;
+            
+        }
+
+        function selectionChanged(){
+            let selection = appSelection.selectedOptions[0];
+            if (selection) {
+                renderCode(selection.value);
+            }
+            else {
+                renderCode();
+            }
+        }
+
+        async function handleNew() {
+            if (provider.state == mgt.ProviderState.SignedIn) {
+                let client = provider.graph.client;
+
+                const applicationData = {
+                    displayName: "mgt-demo-app",
+                    web: {
+                        redirectUris: [
+                            "http://localhost:3000"
+                        ],
+                        implicitGrantSettings: {
+                            enableIdTokenIssuance: true,
+                            enableAccessTokenIssuance: true
+                        }
+                    }
+                };
+
+                let application = await client.api('applications')
+                                                .version('beta')
+                                                .middlewareOptions(mgt.prepScopes('Directory.AccessAsUser.All'))
+                                                .post(applicationData);
+
+                if (application) {
+                    let option = document.createElement('option');
+                    option.text = application.displayName;
+                    option.value = application.appId;
+
+                    appSelection.appendChild(option);
+                    appSelection.selectedIndex = appSelection.options.length - 1;
+                    selectionChanged();
+                }
+
+            }
+        }
+    
+    </script>
+</body>
+</html>
